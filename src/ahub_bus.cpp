@@ -404,9 +404,9 @@ ahubus_package_type ahubus_run()
 {
     ahubus_package_type package_type = ahubus_package_type::none;
 
-    static uint32_t deadline = 0;
-    static bool expired = false;
-    const uint32_t now = time_ticks32();
+    // 64-bit for the same reason as bambubus_heartbeat_deadline.
+    static uint64_t deadline = 0;
+    const uint64_t now = time_ticks64();
 
     int rx_len = 0;
     _bus_data_type t = _bus_data_type::none;
@@ -432,7 +432,6 @@ ahubus_package_type ahubus_run()
             case ahubus_package_type::heartbeat:
                 ahubus_slave_get_package_heartbeat(buf, rx_len);
                 deadline = now + ms_to_ticks32(1000u);
-                expired = false;
                 break;
 
             case ahubus_package_type::query:
@@ -455,12 +454,7 @@ ahubus_package_type ahubus_run()
         }
     }
 
-    // Latched for the same reason as in bambubus_run(): the signed 32-bit difference
-    // flips sign after ~119 s of silence.
-    if (!expired && (int32_t)(now - deadline) > 0)
-        expired = true;
-
-    if (expired)
+    if (now > deadline)
         package_type = ahubus_package_type::error;
 
     return package_type;
