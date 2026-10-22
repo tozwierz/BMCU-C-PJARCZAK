@@ -1327,6 +1327,8 @@ bambubus_package_type bambubus_run()
     bambubus_package_type stu = bambubus_package_type::none;
 
     static uint32_t last_hb_deadline = 0u;
+    static uint32_t expired_hb_deadline = 0u;
+    static bool hb_expired = false;
     const uint32_t now = time_ticks32();
 
     int rx_len = 0;
@@ -1457,7 +1459,18 @@ bambubus_package_type bambubus_run()
             stu = bambubus_package_type::heartbeat;
     }
 
-    if (time_diff32(now, hb_deadline) > 0)
+    // The signed 32-bit tick difference flips sign after 2^31 ticks (~119 s at 18 MHz),
+    // so latch the timeout until a new heartbeat moves the deadline.
+    if (hb_expired && hb_deadline != expired_hb_deadline)
+        hb_expired = false;
+
+    if (!hb_expired && time_diff32(now, hb_deadline) > 0)
+    {
+        hb_expired = true;
+        expired_hb_deadline = hb_deadline;
+    }
+
+    if (hb_expired)
         stu = bambubus_package_type::error;
 
     return stu;
